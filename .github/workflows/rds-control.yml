@@ -1,0 +1,69 @@
+name: Controlar instâncias RDS Homologação
+
+on:
+  schedule:
+    # Desligar: 22h BRT (01h UTC)
+    - cron: '0 1 * * 1-5'
+    # Ligar: 6h BRT (9h UTC)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: 'Ação a ser executada'
+        required: true
+        default: 'desligar'
+        type: choice
+        options:
+          - ligar
+          - desligar
+
+jobs:
+  controlar-rds:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configurar AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Definir ação automática (cron) ou manual
+        id: acao
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            HORA_UTC=$(date -u +'%H')
+            if [[ "$HORA_UTC" == "01" ]]; then
+              echo "acao=desligar" >> $GITHUB_OUTPUT
+            elif [[ "$HORA_UTC" == "09" ]]; then
+              echo "acao=ligar" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Horário inválido"
+              exit 1
+            fi
+          else
+            echo "acao=${{ github.event.inputs.acao }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Executar Ação
+        run: |
+          ACAO=${{ steps.acao.outputs.acao }}
+
+          DBS=(
+            homolog-db
+            homolog-teste-db
+            homolog-teste-db-2
+            homolog-teste-db-3
+            homolog-teste-db-4
+          )
+
+          for db in "${DBS[@]}"; do
+            if [ "$ACAO" = "ligar" ]; then
+              echo "Ligando $db"
+              aws rds start-db-instance --db-instance-identifier "$db"
+            else
+              echo "Desligando $db"
+              aws rds stop-db-instance --db-instance-identifier "$db"
+            fi
+          done
