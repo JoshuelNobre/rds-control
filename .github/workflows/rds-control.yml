@@ -3,9 +3,9 @@ name: Controlar instâncias RDS Homologação
 on:
   schedule:
     # Desligar: 22h BRT (01h UTC)
-    - cron: '0 1 * * 1-5'
+    - cron: '0 22 * * 1-5'
     # Ligar: 6h BRT (9h UTC)
-    - cron: '0 9 * * 1-5'
+    - cron: '0 6 * * 1-5'
   workflow_dispatch:
     inputs:
       acao:
@@ -39,9 +39,9 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             HORA_UTC=$(date -u +'%H')
-            if [[ "$HORA_UTC" == "01" ]]; then
+            if [[ "$HORA_UTC" == "22" ]]; then
               echo "acao=desligar" >> $GITHUB_OUTPUT
-            elif [[ "$HORA_UTC" == "09" ]]; then
+            elif [[ "$HORA_UTC" == "06" ]]; then
               echo "acao=ligar" >> $GITHUB_OUTPUT
             else
               echo "❌ Horário inválido"
