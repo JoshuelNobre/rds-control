@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verificar horário UTC
+        run: |
+          echo "Data/hora atual (UTC): $(date -u)"
+          echo "Data/hora local: $(date)"
+          
       - name: Configurar AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
