@@ -54,7 +54,6 @@ jobs:
       - name: Executar Ação
         run: |
           ACAO=${{ steps.acao.outputs.acao }}
-
           DBS=(
             homolog-db
             homolog-teste-db
@@ -63,12 +62,47 @@ jobs:
             homolog-teste-db-4
           )
 
+          echo "### 🧾 Resumo da ação ($ACAO)" >> $GITHUB_STEP_SUMMARY
+
           for db in "${DBS[@]}"; do
-            if [ "$ACAO" = "ligar" ]; then
-              echo "Ligando $db"
-              aws rds start-db-instance --db-instance-identifier "$db"
-            else
-              echo "Desligando $db"
-              aws rds stop-db-instance --db-instance-identifier "$db"
+            echo "🔍 Verificando status da instância $db..."
+
+            STATUS=$(aws rds describe-db-instances \
+              --db-instance-identifier "$db" \
+              --query "DBInstances[0].DBInstanceStatus" \
+              --output text 2>/dev/null)
+
+            if [[ $? -ne 0 ]]; then
+              echo "❌ Erro ao obter status da instância $db" | tee -a $GITHUB_STEP_SUMMARY
+              continue
             fi
+
+            echo "📌 Status atual: $STATUS"
+
+            if [[ "$ACAO" == "ligar" ]]; then
+              if [[ "$STATUS" == "stopped" ]]; then
+                echo "🚀 Iniciando $db..."
+                if aws rds start-db-instance --db-instance-identifier "$db" >/dev/null 2>&1; then
+                  echo "✅ $db iniciada com sucesso" | tee -a $GITHUB_STEP_SUMMARY
+                else
+                  echo "❌ Falha ao iniciar $db" | tee -a $GITHUB_STEP_SUMMARY
+                fi
+              else
+                echo "⚠️ $db ignorada (status atual: $STATUS)" | tee -a $GITHUB_STEP_SUMMARY
+              fi
+
+            else
+              if [[ "$STATUS" == "available" ]]; then
+                echo "🛑 Parando $db..."
+                if aws rds stop-db-instance --db-instance-identifier "$db" >/dev/null 2>&1; then
+                  echo "✅ $db parada com sucesso" | tee -a $GITHUB_STEP_SUMMARY
+                else
+                  echo "❌ Falha ao parar $db" | tee -a $GITHUB_STEP_SUMMARY
+                fi
+              else
+                echo "⚠️ $db ignorada (status atual: $STATUS)" | tee -a $GITHUB_STEP_SUMMARY
+              fi
+            fi
+
+            echo "---"
           done
